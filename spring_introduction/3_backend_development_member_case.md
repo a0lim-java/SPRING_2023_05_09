@@ -343,3 +343,6 @@ JUnit이라는 프레임워크로 테스트를 실행해서 이러한 문제를 
         }
         ... @AfterEach
     ```
+
+## 정리  
+![image](https://user-images.githubusercontent.com/104348646/198265937-ee0a1fea-cba5-40fe-b982-7f7fc242186a.png)  
