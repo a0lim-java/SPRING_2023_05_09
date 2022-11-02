@@ -39,3 +39,309 @@
     insert into member(name) values('spring')
     ```  
     ![image](https://user-images.githubusercontent.com/104348646/199231128-f8f7c6d2-39c6-48b9-85f9-08f757f1556e.png)
+
+## 순수 Jdbc
+* db sql로 application 서버와 DB를 연결하는 기술
+
+### 환경 설정
+* build.gradle 파일에 dependencies 추가
+  - jdbc, h2 데이터베이스 관련 라이브러리
+  ```
+  implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+  runtimeOnly 'com.h2database:h2'
+  ```
+* 스프링 부트 데이터베이스 연결 설정 추가
+  - main/java/resources/application.properties
+  ```
+  spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+  spring.datasource.driver-class-name=org.h2.Driver
+  spring.datasource.username=sa
+  spring.datasource.password=1234 // 비밀번호를 설정한 경우
+  ```
+  - application.properties 실행(Load Gadle Changes)
+  - cf) 스프링부터 2.4 이후부터 spring.datasource.username=sa 추가 필요
+    + 공백은 모두 제거해야 함
+
+### Jdbc 리포지토리 구현
+* 20년 전에 사용되던 방법
+* Jdbc 회원 리포지토리
+  - main/java/hello.hellospring/repository/JdbcMemberRepository 클래스 생성
+  - db와 연동해서 Jdbc로 구현/실행
+  - cf) 이전 작업: interface 메모리로 구현/실행
+  ```
+  package hello.hellospring.repository;
+  import hello.hellospring.domain.Member;
+  import org.springframework.jdbc.datasource.DataSourceUtils;
+  import javax.sql.DataSource;
+  import java.sql.*;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Optional;
+  public class JdbcMemberRepository implements MemberRepository {
+
+      // dataSource(접속 정보): 스프링으로부터 주입 받음
+      private final DataSource dataSource;
+      public JdbcMemberRepository(DataSource dataSource) {
+          this.dataSource = dataSource;
+      }
+
+      @Override
+      public Member save(Member member) {
+          String sql = "insert into member(name) values(?)";
+          Connection conn = null; // db connection 가져옴
+          PreparedStatement pstmt = null; // sql 문장 작성
+          ResultSet rs = null; // 결과값 받음
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql,
+                      Statement.RETURN_GENERATED_KEYS); // RETURN_GENERATED_KEYS: db에 insert할 때 사용 -> id: 1, 2, ...
+
+              pstmt.setString(1, member.getName()); // name 입력
+              pstmt.executeUpdate();  // db에서 쿼리 실행
+              rs = pstmt.getGeneratedKeys(); // db에서 key 생성해서 받음 -> id 입력 없이도 자동으로 입력
+              if (rs.next()) {
+                  member.setId(rs.getLong(1)); // id가 있으면 반환
+              } else {
+                  throw new SQLException("id 조회 실패");
+              }
+              return member;
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public Optional<Member> findById(Long id) {
+          String sql = "select * from member where id = ?";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+              pstmt.setLong(1, id);
+
+              rs = pstmt.executeQuery(); // 조회
+
+              if(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  return Optional.of(member);
+              } else {
+                  return Optional.empty();
+              }
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public List<Member> findAll() {
+          String sql = "select * from member";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+
+              rs = pstmt.executeQuery();
+
+              List<Member> members = new ArrayList<>();
+              while(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  members.add(member);
+              }
+              return members;
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public Optional<Member> findByName(String name) {
+          String sql = "select * from member where name = ?";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+              pstmt.setString(1, name);
+              rs = pstmt.executeQuery();
+              if(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  return Optional.of(member);
+              }
+              return Optional.empty();
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      private Connection getConnection() {
+          return DataSourceUtils.getConnection(dataSource); // DataSourceUtils를 통해 데이터를 받음 -> 트랙잰션을 유지함
+      }
+
+      // resource를 close: 서비스 끝난 뒤 연결을 차단함
+      private void close(Connection conn, PreparedStatement pstmt, ResultSet rs)
+      {
+          try {
+              if (rs != null) {
+                  rs.close();
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+          try {
+              if (pstmt != null) {
+                  pstmt.close();
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+          try {
+              if (conn != null) {
+                  close(conn);
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+      }
+      private void close(Connection conn) throws SQLException {
+          DataSourceUtils.releaseConnection(conn, dataSource); // DataSourceUtils를 통해 release
+      }
+  }
+  ```
+* 스프링 설정 변경
+  - main/java/hello.hellospring/service/SpringConfig 
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.repository.JdbcMemberRepository;
+  import hello.hellospring.repository.MemberRepository;
+  import hello.hellospring.repository.MemoryMemberRepository;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+
+  import javax.sql.DataSource;
+
+  @Configuration
+  public class SpringConfig {
+
+
+      private final DataSource dataSource;
+
+      @Autowired
+      public SpringConfig(DataSource dataSource){
+          this.dataSource = dataSource;
+      }
+
+      @Bean // 스프링 빈에 등록
+      public MemberService memberService(){
+          return new MemberService(memberRepository());
+      }
+
+      @Bean // MJdbcMemberRepository로 연결
+      public MemberRepository memberRepository(){
+          return new JdbcMemberRepository(dataSource);
+      }
+  }
+  ```
+  - DataSource: 데이터베이스 커넥션을 획득할 때 사용하는 객체
+  - 스프링 부트: 는 데이터베이스 커넥션 정보를 바탕으로 DataSource를 생성하고 스프링 빈으로 만듦 -> DI를 받을 수 있음
+* 구현 클래스 추가 이미지  
+  ![image](https://user-images.githubusercontent.com/104348646/199457961-934473dc-f6d7-457e-ac36-045ffbfe2972.png)  
+* 스프링 설정 이미지  
+  ![image](https://user-images.githubusercontent.com/104348646/199458007-2a7aa379-f896-4a0c-9218-e8b5017042ed.png)  
+  - 개방-폐쇄 원칙(OCP: Open-Closed Principle)
+    + Open: 확장 / Closed: 수정, 변경
+  - 스프링의 DI를 사용하면, 기존 코드의 수정/추가 없이 설정만으로 구현 클래스 변경이 가능
+
+## 스프링 통합 테스트
+* 스프링 컨테이너와 DB까지 연결한 통합 테스트
+* 회원 서비스 스프링 통합 테스트
+  - main/test/java/hello.hellospring/service/MemberServiceIntegration 클래스 생성
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.domain.Member;
+  import hello.hellospring.repository.MemberRepository;
+  import org.junit.jupiter.api.Test;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.boot.test.context.SpringBootTest;
+  import org.springframework.transaction.annotation.Transactional;
+
+  import static org.assertj.core.api.Assertions.assertThat;
+  import static org.junit.jupiter.api.Assertions.assertThrows;
+
+  @SpringBootTest
+  @Transactional
+  class MemberServiceIntegrantionTest {
+
+      // test에서 사용 시, 필드 기반으로 @Autowired 사용 가능 <- 테스트가 가장 마지막 단계임
+      @Autowired MemberService memberService;
+      @Autowired MemberRepository memberRepository;
+
+      @Test
+      public void 회원가입() throws Exception{
+          // given: 상황, 데이터
+          Member member = new Member();
+          member.setName("hello");
+
+          // when: 검증 조건
+          Long saveId = memberService.join(member);
+
+          // then: 검증
+          Member findMember = memberService.findOne(saveId).get();
+          assertThat(member.getName()).isEqualTo(findMember.getName());
+      }
+
+      @Test
+      public void 중복_회원_예외() throws Exception{
+          // given: 중복된 데이터
+          Member member1 = new Member();
+          member1.setName("spring");
+
+          Member member2 = new Member();
+          member2.setName("spring");
+
+          // when
+          memberService.join(member1);
+          /// assertThrows로 오류 처리
+          IllegalStateException e = assertThrows(IllegalStateException.class, () -> memberService.join(member2)); // 예외가 발생해야 함
+
+          assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다."); // 메세지 검증
+
+          /// try-catch로 오류 처리
+          /*
+          try {
+              memberService.join(member2);
+              fail("예외가 발생해야 합니다."); // 실행 안됨
+          } catch (IllegalStateException e){ // 예외가 작동됨
+              assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다."); // 메세지 검증
+          }
+           */
+
+          // then
+      }
+  }
+  ```
+  - @SpringBootTest : 스프링 컨테이너와 테스트를 함께 실행
+  - @Transactional : 테스트 케이스에 작성하면, 테스트 시작 전에 트랜잭션을 시작하고, 테스트 완료 후에 항상 롤백함 -> DB에 데이터가 남지 않음 -> 다음 테스트에 영향 없음
