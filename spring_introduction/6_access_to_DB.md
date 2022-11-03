@@ -58,7 +58,7 @@
   spring.datasource.username=sa
   spring.datasource.password=1234 // 비밀번호를 설정한 경우
   ```
-  - application.properties 실행(Load Gadle Changes)
+  - application.properties 실행(Gadle 변경 로드 실행)
   - cf) 스프링부터 2.4 이후부터 spring.datasource.username=sa 추가 필요
     + 공백은 모두 제거해야 함
 
@@ -345,3 +345,445 @@
   ```
   - @SpringBootTest : 스프링 컨테이너와 테스트를 함께 실행
   - @Transactional : 테스트 케이스에 작성하면, 테스트 시작 전에 트랜잭션을 시작하고, 테스트 완료 후에 항상 롤백함 -> DB에 데이터가 남지 않음 -> 다음 테스트에 영향 없음
+
+### 스프링 JdbcTemplate
+* 환경설정: 순수 Jdbc와 동일 
+* 스프링 JdbcTemplate과 MyBatis 같은 라이브러리는 JDBC API에서 본 반복 코드를 대부분 제거 / SQL은 직접 작성 필요
+* 스프링 JdbcTemplate 회원 리포지토리
+  - java/hello.hellospring/repository/JdbcTemplateMemberRepository 클래스 생성
+  ```
+  package hello.hellospring.repository;
+  import hello.hellospring.domain.Member;
+  import org.springframework.jdbc.datasource.DataSourceUtils;
+  import javax.sql.DataSource;
+  import java.sql.*;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Optional;
+  public class JdbcMemberRepository implements MemberRepository {
+
+      // dataSource(접속 정보): 스프링으로부터 주입 받음
+      private final DataSource dataSource;
+      public JdbcMemberRepository(DataSource dataSource) {
+          this.dataSource = dataSource;
+      }
+
+      @Override
+      public Member save(Member member) {
+          String sql = "insert into member(name) values(?)";
+          Connection conn = null; // db connection 가져옴
+          PreparedStatement pstmt = null; // sql 문장 작성
+          ResultSet rs = null; // 결과값 받음
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql,
+                      Statement.RETURN_GENERATED_KEYS); // RETURN_GENERATED_KEYS: db에 insert할 때 사용 -> id: 1, 2, ...
+
+              pstmt.setString(1, member.getName()); // name 입력
+              pstmt.executeUpdate();  // db에서 쿼리 실행
+              rs = pstmt.getGeneratedKeys(); // db에서 key 생성해서 받음 -> id 입력 없이도 자동으로 입력
+              if (rs.next()) {
+                  member.setId(rs.getLong(1)); // id가 있으면 반환
+              } else {
+                  throw new SQLException("id 조회 실패");
+              }
+              return member;
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public Optional<Member> findById(Long id) {
+          String sql = "select * from member where id = ?";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+              pstmt.setLong(1, id);
+
+              rs = pstmt.executeQuery(); // 조회
+
+              if(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  return Optional.of(member);
+              } else {
+                  return Optional.empty();
+              }
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public List<Member> findAll() {
+          String sql = "select * from member";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+
+              rs = pstmt.executeQuery();
+
+              List<Member> members = new ArrayList<>();
+              while(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  members.add(member);
+              }
+              return members;
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      @Override
+      public Optional<Member> findByName(String name) {
+          String sql = "select * from member where name = ?";
+
+          Connection conn = null;
+          PreparedStatement pstmt = null;
+          ResultSet rs = null;
+
+          try {
+              conn = getConnection();
+              pstmt = conn.prepareStatement(sql);
+              pstmt.setString(1, name);
+              rs = pstmt.executeQuery();
+              if(rs.next()) {
+                  Member member = new Member();
+                  member.setId(rs.getLong("id"));
+                  member.setName(rs.getString("name"));
+                  return Optional.of(member);
+              }
+              return Optional.empty();
+          } catch (Exception e) {
+              throw new IllegalStateException(e);
+          } finally {
+              close(conn, pstmt, rs);
+          }
+      }
+      private Connection getConnection() {
+          return DataSourceUtils.getConnection(dataSource); // DataSourceUtils를 통해 데이터를 받음 -> 트랙잰션을 유지함
+      }
+
+      // resource를 close: 서비스 끝난 뒤 연결을 차단함
+      private void close(Connection conn, PreparedStatement pstmt, ResultSet rs)
+      {
+          try {
+              if (rs != null) {
+                  rs.close();
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+          try {
+              if (pstmt != null) {
+                  pstmt.close();
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+          try {
+              if (conn != null) {
+                  close(conn);
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+      }
+      private void close(Connection conn) throws SQLException {
+          DataSourceUtils.releaseConnection(conn, dataSource); // DataSourceUtils를 통해 release
+      }
+  }
+  ```
+* JdbcTemplate을 사용하도록 스프링 설정 변경
+  - java/hello.hellospring/service/SpringService 연결 repository를 변경
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.repository.JdbcMemberRepository;
+  import hello.hellospring.repository.JdbcTemplateMemberRepository;
+  import hello.hellospring.repository.MemberRepository;
+  import hello.hellospring.repository.MemoryMemberRepository;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+
+  import javax.sql.DataSource;
+
+  @Configuration
+  public class SpringConfig {
+
+
+      private final DataSource dataSource;
+
+      @Autowired
+      public SpringConfig(DataSource dataSource){
+          this.dataSource = dataSource;
+      }
+
+      @Bean // 스프링 빈에 등록
+      public MemberService memberService(){
+          return new MemberService(memberRepository());
+      }
+
+      @Bean
+      public MemberRepository memberRepository(){
+          return new JdbcTemplateMemberRepository(dataSource);  // JdbcTemplateMemberRepository로 연결
+      }
+  }
+  ```
+  
+## JPA
+* JPA는 기존의 반복 코드 + 기본적인 SQL도 JPA가 직접 만들어서 실행
+* 패러다임을 전환: SQL과 데이터 중심의 설계 -> 객체 중심의 설계
+* 개발 생산성 향상
+
+* build.gradle 파일에 JPA, h2 데이터베이스 관련 라이브러리 추가
+  ```
+  plugins {
+    id 'org.springframework.boot' version '2.7.5'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'java'
+  }
+
+  group = 'hello'
+  version = '0.0.1-SNAPSHOT'
+  sourceCompatibility = '8'
+
+  repositories {
+    mavenCentral()
+  }
+
+  dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa' //JPA, Jdbc 포함
+    runtimeOnly 'com.h2database:h2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  }
+
+  tasks.named('test') {
+    useJUnitPlatform()
+  }
+  ```
+* 스프링 부트에 JPA 설정 추가
+  - resources/application.properties
+  ```
+  spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+  spring.datasource.driver-class-name=org.h2.Driver
+
+  spring.jpa.show-sql=true // jpa가 생성하는 sql을 출력
+  spring.jpa.hibernate.ddl-auto=none // 테이블 자동 생성 옵션 끔 / create: 엔티티 정보로 테이블 생성함
+
+  spring.datasource.username=sa
+  spring.datasource.password=1234
+  ```
+* JPA 엔터티 매핑
+  -  java/hello.hellospring/domain/Member 클래스
+  ```
+  package hello.hellospring.domain;
+
+  import javax.persistence.Entity;
+  import javax.persistence.GeneratedValue;
+  import javax.persistence.GenerationType;
+  import javax.persistence.Id;
+
+  @Entity // 자바가 관리하는 Entity
+  public class Member {
+
+      @Id @GeneratedValue(strategy = GenerationType.IDENTITY) // @Id: PK / IDENTITY: DB가 자동으로 생성하는 방식
+      private Long id;
+      private String name;
+
+      public Long getId(){
+          return id;
+      }
+
+      public void setId(Long id){
+          this.id = id;
+      }
+
+      public String getName(){
+          return name;
+      }
+
+      public void setName(String name){
+          this.name = name;
+      }
+  }
+  ```
+* JPA 회원 리포지토리
+  - java/hello.hellospring/repository/JpaMemberRepository 클래스 생성
+  ```
+  package hello.hellospring.repository;
+
+  import hello.hellospring.domain.Member;
+
+  import javax.persistence.EntityManager;
+  import java.util.List;
+  import java.util.Optional;
+
+  public class JpaMemberRepository implements MemberRepository{
+
+      private final EntityManager em;
+
+      public JpaMemberRepository(EntityManager em){
+          this.em = em;
+      }
+
+      @Override
+      public Member save(Member member) {
+          em.persist(member); // JPA가 insert 쿼리 작성/실행 + setID 실행
+          return member;
+      }
+
+      @Override
+      public Optional<Member> findById(Long id) {
+          Member member = em.find(Member.class, id); // 조회할 타입 + 식별자(PK) -> 조회
+          return Optional.ofNullable(member); // 결과값이 없을 수 있음
+      }
+
+      @Override
+      public Optional<Member> findByName(String name) {
+          List<Member> result = em.createQuery("select m member from Member m where m.name = :name", Member.class)
+                  .setParameter("name", name)
+                  . getResultList();
+
+          return result.stream().findAny();
+      }
+
+      @Override
+      public List<Member> findAll() {
+          return em.createQuery("select m from Member m", Member.class).getResultList(); // qlString: jpql 쿼리 언어 -> 객체를 대상으로 쿼리 생성
+      }
+  }
+  ```
+* 서비스 계층에 트랜잭션 추가
+  - java/hello.hellospring/service/MemberService 클래스에 @Transactional 설정 추가
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.domain.Member;
+  import hello.hellospring.repository.MemberRepository;
+  import hello.hellospring.repository.MemoryMemberRepository;
+  import org.springframework.stereotype.Service;
+  import org.springframework.transaction.annotation.Transactional;
+
+  import java.util.List;
+  import java.util.Optional;
+
+  @Transactional // join될 때, 모든 데이터 변경이 Transaction 안에서 실행됨
+  public class MemberService {
+  ```
+  - org.springframework.transaction.annotation.Transactional 를 사용하자.
+  - 스프링은 해당 클래스의 메서드를 실행할 때 트랜잭션을 시작하고, 메서드가 정상 종료되면 트랜잭션을 커밋한다. 만약 런타임 예외가 발생하면 롤백한다.
+  - JPA를 통한 모든 데이터 변경은 트랜잭션 안에서 실행해야 한다.
+
+* JPA를 사용하도록 스프링 설정 변경
+  - java/hello.hellospring/service/SpringConfig
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.repository.*;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+
+  import javax.persistence.EntityManager;
+  import javax.sql.DataSource;
+  import javax.xml.crypto.Data;
+
+  @Configuration
+  public class SpringConfig {
+      private final DataSource dataSource;
+      private EntityManager em;
+
+      public SpringConfig(DataSource dataSource, EntityManager em){
+          this.dataSource = dataSource;
+          this.em = em;
+      }
+
+      @Bean // 스프링 빈에 등록
+      public MemberService memberService(){
+          return new MemberService(memberRepository());
+      }
+
+      @Bean // MJdbcMemberRepository로 연결
+      public MemberRepository memberRepository(){
+          return new JpaMemberRepository(em);
+      }
+  }
+  ```
+  
+## 스프링 데이터 JPA
+* JPA를 먼저 학습한 후에 스프링 데이터 JPA를 학습
+* 환경설정: 앞의 JPA 설정과 동일
+
+* 스프링 데이터 JPA 회원 리포지토리
+  - java/hello.hellospring/repository/SpringDataJpaMemberRepository 인터페이스 생성
+  ```
+  package hello.hellospring.repository;
+
+  import hello.hellospring.domain.Member;
+  import org.springframework.data.jpa.repository.JpaRepository;
+
+  import java.util.Optional;
+
+  // 인터페이스만 존재 -> 구현체를 자동으로 생성/ 스프링 빈을 등록
+  public interface SpringDataJpaMemberRepository extends JpaRepository<Member, Long>, MemberRepository {
+
+      @Override
+      Optional<Member> findByName(String name);
+  }
+  ```
+* 스프링 데이터 JPA 회원 리포지토리를 사용하도록 스프링 설정 변경
+  - java/hello.hellospring/service/SpringConfig
+  ```
+  package hello.hellospring.service;
+
+  import hello.hellospring.repository.*;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+
+  @Configuration
+  public class SpringConfig {
+
+      private final MemberRepository memberRepository;
+
+      @Autowired
+      public SpringConfig(MemberRepository memberRepository) {
+          this.memberRepository = memberRepository;
+      }
+
+      @Bean // 스프링 빈에 등록
+      public MemberService memberService(){
+          return new MemberService(memberRepository);
+      }
+  }
+  ```
+  - 스프링 데이터 JPA가 SpringDataJpaMemberRepository 를 스프링 빈으로 자동 등록해준다.
+* 스프링 데이터 JPA 제공 클래스  
+![image](https://user-images.githubusercontent.com/104348646/199636680-cb7ffe21-e1f9-4eca-b33c-279f0187cbb8.png)  
+* 스프링 데이터 JPA 제공 기능
+  - 인터페이스를 통한 기본적인 CRUD
+  - findByName(), findByEmail()처럼 메서드 이름만으로 조회 기능 제공
+  - 페이징 기능 자동 제공
+  - cf) 실무
+
