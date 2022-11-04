@@ -293,7 +293,7 @@
 
   @SpringBootTest
   @Transactional
-  class MemberServiceIntegrantionTest {
+  class MemberServiceIntegrationTest {
 
       // test에서 사용 시, 필드 기반으로 @Autowired 사용 가능 <- 테스트가 가장 마지막 단계임
       @Autowired MemberService memberService;
@@ -330,14 +330,14 @@
           assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다."); // 메세지 검증
 
           /// try-catch로 오류 처리
-          /*
-          try {
-              memberService.join(member2);
-              fail("예외가 발생해야 합니다."); // 실행 안됨
-          } catch (IllegalStateException e){ // 예외가 작동됨
-              assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다."); // 메세지 검증
-          }
-           */
+            /*
+            try {
+                memberService.join(member2);
+                fail("예외가 발생해야 합니다."); // 실행 안됨
+            } catch (IllegalStateException e){ // 예외가 작동됨
+                assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다."); // 메세지 검증
+            }
+             */
 
           // then
       }
@@ -512,7 +512,7 @@
   }
   ```
 * JdbcTemplate을 사용하도록 스프링 설정 변경
-  - java/hello.hellospring/service/SpringService 연결 repository를 변경
+  - java/hello.hellospring/service/SpringConfig 연결 repository를 변경
   ```
   package hello.hellospring.service;
 
@@ -647,32 +647,31 @@
           this.em = em;
       }
 
-      @Override
+
       public Member save(Member member) {
           em.persist(member); // JPA가 insert 쿼리 작성/실행 + setID 실행
           return member;
       }
 
-      @Override
+
       public Optional<Member> findById(Long id) {
           Member member = em.find(Member.class, id); // 조회할 타입 + 식별자(PK) -> 조회
           return Optional.ofNullable(member); // 결과값이 없을 수 있음
       }
 
-      @Override
+      public List<Member> findAll() {
+          return em.createQuery("select m from Member m", Member.class).getResultList(); // qlString: jpql 쿼리 언어 -> 객체를 대상으로 쿼리 생성
+      }
+
       public Optional<Member> findByName(String name) {
-          List<Member> result = em.createQuery("select m member from Member m where m.name = :name", Member.class)
+          List<Member> result = em.createQuery("select m from Member m where m.name = :name", Member.class)
                   .setParameter("name", name)
                   . getResultList();
 
           return result.stream().findAny();
       }
-
-      @Override
-      public List<Member> findAll() {
-          return em.createQuery("select m from Member m", Member.class).getResultList(); // qlString: jpql 쿼리 언어 -> 객체를 대상으로 쿼리 생성
-      }
   }
+
   ```
 * 서비스 계층에 트랜잭션 추가
   - java/hello.hellospring/service/MemberService 클래스에 @Transactional 설정 추가
@@ -785,5 +784,7 @@
   - 인터페이스를 통한 기본적인 CRUD
   - findByName(), findByEmail()처럼 메서드 이름만으로 조회 기능 제공
   - 페이징 기능 자동 제공
-  - cf) 실무
-
+  - cf) 실무 사용 기술
+    + 기본: JPA, 스프링 데이터 JPA
+    + 복잡한 동적 쿼리: Querydsl -> 자바 코드로 쿼리 작성 가능, 동적 쿼리 작성 가능
+    + 그 외의 어려운 쿼리: JPA가 제공하는 네이티브 쿼리, 스프링 JdbcTemplate
