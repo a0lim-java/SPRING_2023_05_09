@@ -22,3 +22,60 @@
     + 페이징 API 사용 가능: 단일 값 연관 필드(일대일, 다대일)
     + 페이징 API 사용 불가: 컬렉션(일대다)
 * 참고: https://kihwan95.tistory.com/12
+
+## 예시
+
+### 1. 기본
+* Entity
+  ```
+  @Entity
+  
+  public class Member{
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "member_id"}
+  private Long id;
+  
+  @Column(name = "member_name")
+  private String name;
+  ```
+* Repository
+  ```
+  @Repository
+  
+  public interface MemberRepository{
+  @Query("select m from member m where id = :id}
+  Optional<Member> findById(@Param("id" Long id)
+  ```
+  
+### 2. 매개변수의 타입이 복합된 경우
+* Entity
+  ```
+  @Entity
+  
+  public class Member{
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "member_id"}
+  private IdInfo id;
+  
+  @Column(name = "member_name")
+  private String name;
+  ```
+  ```
+  @Entity
+  
+  public class IdInfo{
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "member_id"}
+  private Long id;
+  
+  @Column(name = "seq")
+  private Long seq;
+  ```
+* Repository
+  ```
+  @Repository
+  
+  public interface MemberRepository{
+  @Query("select m from member m where m.IdInfo.id = :id} // IdInfo Entity의 id 값(타입)을 의미
+  Optional<Member> findById(@Param("id" Long id)
+  ```
