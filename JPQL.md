@@ -1,3 +1,17 @@
+# Querydsl - JPAQueryFactory
+
+* 이미 테이블이 존재하는 경우 이를 바탕으로 쿼리타입을 생성하여 질의할 때 이용하는 방식
+
+* 참고
+  - Querydsl의 종류: http://ojc.asia/bbs/board.php?bo_table=LecJpa&wr_id=341
+
+# Querydsl - JPASqlQuery
+
+* @Query 어노테이션을 사용함
+* JPQL 형식으로 작성
+
+# JPQL
+
 ## 기본 문법
 * SQL과 유사
   - SELECT, FROM, WHERE, GROUP BY, HABING, JOIN 지원
