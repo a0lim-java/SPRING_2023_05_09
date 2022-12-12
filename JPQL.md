@@ -2,8 +2,45 @@
 
 * 이미 테이블이 존재하는 경우 이를 바탕으로 쿼리타입을 생성하여 질의할 때 이용하는 방식
 
+* 결과를 DTO로 조회할 때, 빈을 생성하는 방법
+```
+    // setter를 이용하여 주입
+    @Test
+    public void findDtoBySetter() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.bean(MemberDto.class, 
+                            member.username,
+                            member.age))
+                .from(member)
+                .fetch();
+    }
+
+    // 필드에 바로 값을 꼽아버림
+    @Test
+    public void findDtoByField() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.fields(MemberDto.class, 
+                            member.username,
+                            member.age))
+                .from(member)
+                .fetch();
+    }
+
+    // 생성자를 이용하여 주입
+    @Test
+    public void findDtoByConstructor() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.constructor(MemberDto.class, 
+                            member.username,
+                            member.age))
+                .from(member)
+                .fetch();
+    }
+```
+
 * 참고
   - Querydsl의 종류: http://ojc.asia/bbs/board.php?bo_table=LecJpa&wr_id=341
+  - 빈 생성 방법: https://ykh6242.tistory.com/entry/QueryDSL3-%ED%94%84%EB%A1%9C%EC%A0%9D%EC%85%98-distinct-%EB%8F%99%EC%A0%81-%EC%BF%BC%EB%A6%AC-%EB%B2%8C%ED%81%AC-%EC%97%B0%EC%82%B0
 
 # Querydsl - JPASqlQuery
 
