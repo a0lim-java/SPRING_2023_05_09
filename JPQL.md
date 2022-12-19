@@ -15,7 +15,7 @@
                 .fetch();
     }
 
-    // 필드에 바로 값을 꼽아버림
+    // 필드에 바로 값을 꽂음
     @Test
     public void findDtoByField() {
         List<MemberDto> result = queryFactory
