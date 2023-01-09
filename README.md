@@ -70,3 +70,23 @@ Student [newVariable] = new Student(
     studentRepository.getReferenceById([Student 타입의 변수].getName())
 );
 ```
+
+## fetch 종류
+* fetch()
+  : 리스트로 결과를 반환
+  - 데이터가 없는 경우, 빈 리스트를 반환
+* fetchOne()
+  : 단건 조회
+  - 결과가 없는 경우, null을 반환
+  - 결과가 두 개 이상인 경우, NonUniqueResultException Error
+* fetchFirst()
+  : 처음 한 건만 쿼리해서 가져옴
+* fetchResults()
+  : Paging
+* fetchCount()
+  : count 쿼리해서 가져옴
+  
+  
+  
+  
+  
