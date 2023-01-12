@@ -1,4 +1,16 @@
-# Querydsl - JPAQueryFactory
+# Query 언어의 종류
+| | Selct 검색 조건 지정 | 2개 이상의 join|
+|-------|--------------|--------------|
+QuerryDsl | O | X |
+JPQL | X | X |
+JPQL(native Query) | O | O |
+JPAQuery, JPAQueryFactory(Q class) | O | O |
+
+* 단, 해당 Entity와의 관계가 다대일인 Attribute는 2개 이상이 되는 경우, JPAQuery, JPAQueryFactory 방법만 사용 가능함  
+  
+![image](https://user-images.githubusercontent.com/104348646/211984875-543f41da-5613-4960-8f8f-e3f6bb3624c0.png)  
+
+## Querydsl - JPAQueryFactory
 
 * 이미 테이블이 존재하는 경우 이를 바탕으로 쿼리타입을 생성하여 질의할 때 이용하는 방식
 
@@ -42,14 +54,14 @@
   - Querydsl의 종류: http://ojc.asia/bbs/board.php?bo_table=LecJpa&wr_id=341
   - 빈 생성 방법: https://ykh6242.tistory.com/entry/QueryDSL3-%ED%94%84%EB%A1%9C%EC%A0%9D%EC%85%98-distinct-%EB%8F%99%EC%A0%81-%EC%BF%BC%EB%A6%AC-%EB%B2%8C%ED%81%AC-%EC%97%B0%EC%82%B0
 
-# Querydsl - JPASqlQuery
+## Querydsl - JPASqlQuery
 
 * @Query 어노테이션을 사용함
 * JPQL 형식으로 작성
 
-# JPQL
+## JPQL
 
-## 기본 문법
+### 기본 문법
 * SQL과 유사
   - SELECT, FROM, WHERE, GROUP BY, HABING, JOIN 지원
 * 쿼리 검색 시, 테이블이 아닌 엔티티 객체를 대상으로 검색
@@ -63,7 +75,7 @@
 
 * 참고: https://velog.io/@guswns3371/%EA%B0%9D%EC%B2%B4%EC%A7%80%ED%96%A5-%EC%BF%BC%EB%A6%AC-%EC%96%B8%EC%96%B41-%EA%B8%B0%EB%B3%B8-%EB%AC%B8%EB%B2%95#jpql---%EA%B8%B0%EB%B3%B8-%EB%AC%B8%EB%B2%95%EA%B3%BC-%EA%B8%B0%EB%8A%A5
 
-## JOIN FETCH
+### JOIN FETCH
 : 연관된 엔티티나 컬렉션을 한 번에 같이 조회하는 기능
 
 * 한계
@@ -74,9 +86,9 @@
     + 페이징 API 사용 불가: 컬렉션(일대다)
 * 참고: https://kihwan95.tistory.com/12
 
-## 예시
+### 예시
 
-### 1. 기본
+#### 1. 기본
 * Entity
   ```
   @Entity
@@ -98,7 +110,7 @@
   Optional<Member> findById(@Param("id" Long id)
   ```
   
-### 2. 매개변수의 타입이 복합된 경우
+#### 2. 매개변수의 타입이 복합된 경우
 * Entity
   ```
   @Entity
